@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Updater Sample</string>
+    <string name="screen_title">Self-hosted updater</string>
+    <string name="screen_description">Enter an HTTPS manifest, check it, then download and install the advertised APK.</string>
+    <string name="manifest_hint">https://repo.example.com/latest.json</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="download_update">Download update</string>
+    <string name="install_update">Install update</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_invalid_configuration">Invalid configuration</string>
+    <string name="status_checking">Checking…</string>
+    <string name="status_current">This app is up to date.</string>
+    <string name="status_available">Version %1$s (%2$d) is available</string>
+    <string name="status_available_mandatory">Version %1$s (%2$d) is available · mandatory</string>
+    <string name="release_note_bullet">• %1$s</string>
+    <string name="status_downloading">Downloading…</string>
+    <string name="status_downloading_progress">Downloading… %1$d%%</string>
+    <string name="status_download_verified">Download verified. Ready to install.</string>
+    <string name="status_installing">Opening Android package installer…</string>
+    <string name="status_install_permission">Allow installs from this app, then return.</string>
+    <string name="status_update_failed">Update failed</string>
+</resources>

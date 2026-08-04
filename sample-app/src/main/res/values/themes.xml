@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.UpdaterSample" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#315DA8</item>
+        <item name="colorPrimaryVariant">#24477F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:statusBarColor">#24477F</item>
+    </style>
+</resources>
+
