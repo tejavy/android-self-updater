@@ -104,7 +104,9 @@ public class Updater @JvmOverloads constructor(
         ensureOpen()
         try {
             publish(UpdateState.Checking) { it.onChecking() }
-            val manifest = withContext(ioDispatcher) { manifestRepository.fetch(manifestHttpUrl) }
+            val manifest = withContext(ioDispatcher) {
+                manifestRepository.fetch(manifestHttpUrl, applicationContext.packageName)
+            }
             UrlValidator.requireHttps(manifest.apkUrl)
             val currentVersionCode = withContext(ioDispatcher) {
                 versionCodeProvider.currentVersionCode()

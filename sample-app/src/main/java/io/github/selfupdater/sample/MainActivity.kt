@@ -2,6 +2,7 @@ package io.github.selfupdater.sample
 
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
@@ -9,6 +10,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import io.github.selfupdater.InstallPermissionRequiredException
+import io.github.selfupdater.MissingApplicationManifestException
 import io.github.selfupdater.UpdateAvailable
 import io.github.selfupdater.Updater
 import io.github.selfupdater.UpdaterException
@@ -23,10 +25,19 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
     private lateinit var statusText: TextView
     private lateinit var releaseNotes: TextView
     private lateinit var progress: ProgressBar
+    private lateinit var credentialInputGroup: View
+    private lateinit var credentialConnectedGroup: View
+    private lateinit var clientIdInput: EditText
+    private lateinit var clientSecretInput: EditText
+    private lateinit var saveCredentialsButton: Button
+    private lateinit var logoutButton: Button
+    private lateinit var credentialStatusText: TextView
+    private lateinit var credentialsStore: CloudflareCredentialsStore
 
     private var updater: Updater? = null
     private var availableUpdate: UpdateAvailable? = null
     private var downloadedApk: File? = null
+    private var pendingCredentials: CloudflareAccessCredentials? = null
 
     private val installPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -38,6 +49,7 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_main)
 
         manifestUrl = findViewById(R.id.manifestUrl)
@@ -47,8 +59,24 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         statusText = findViewById(R.id.statusText)
         releaseNotes = findViewById(R.id.releaseNotes)
         progress = findViewById(R.id.downloadProgress)
+        credentialInputGroup = findViewById(R.id.credentialInputGroup)
+        credentialConnectedGroup = findViewById(R.id.credentialConnectedGroup)
+        clientIdInput = findViewById(R.id.clientIdInput)
+        clientSecretInput = findViewById(R.id.clientSecretInput)
+        saveCredentialsButton = findViewById(R.id.saveCredentialsButton)
+        logoutButton = findViewById(R.id.logoutButton)
+        credentialStatusText = findViewById(R.id.credentialStatusText)
+        credentialsStore = CloudflareCredentialsStore(applicationContext)
 
-        checkButton.setOnClickListener { startCheck() }
+        renderCredentialState(credentialsStore.load() != null)
+        checkButton.setOnClickListener {
+            pendingCredentials = null
+            val credentials = credentialsStore.load()
+            if (credentials == null) renderCredentialState(configured = false)
+            startCheck(credentials)
+        }
+        saveCredentialsButton.setOnClickListener { saveAndConnect() }
+        logoutButton.setOnClickListener { logout() }
         downloadButton.setOnClickListener {
             availableUpdate?.let { update -> updater?.download(update) }
         }
@@ -59,7 +87,19 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         }
     }
 
-    private fun startCheck() {
+    private fun saveAndConnect() {
+        val clientId = clientIdInput.text.toString().trim()
+        val clientSecret = clientSecretInput.text.toString().trim()
+        if (clientId.isEmpty() || clientSecret.isEmpty()) {
+            credentialStatusText.setText(R.string.cloudflare_credentials_required)
+            return
+        }
+        val credentials = CloudflareAccessCredentials(clientId, clientSecret)
+        pendingCredentials = credentials
+        startCheck(credentials)
+    }
+
+    private fun startCheck(credentials: CloudflareAccessCredentials?) {
         updater?.close()
         availableUpdate = null
         downloadedApk = null
@@ -73,8 +113,16 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
                 .manifestUrl(manifestUrl.text.toString().trim())
                 .listener(this)
                 .requestTimeoutSeconds(30)
+                .apply {
+                    if (credentials != null) {
+                        header(CF_ACCESS_CLIENT_ID, credentials.clientId)
+                        header(CF_ACCESS_CLIENT_SECRET, credentials.clientSecret)
+                    }
+                }
                 .build()
         }.getOrElse { error ->
+            pendingCredentials = null
+            saveCredentialsButton.isEnabled = true
             statusText.text = error.message ?: getString(R.string.status_invalid_configuration)
             return
         }
@@ -83,17 +131,20 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
 
     override fun onChecking() {
         checkButton.isEnabled = false
+        saveCredentialsButton.isEnabled = false
         statusText.setText(R.string.status_checking)
     }
 
     override fun onNoUpdate() {
         checkButton.isEnabled = true
+        completePendingCredentialSave()
         statusText.setText(R.string.status_current)
     }
 
     override fun onUpdateAvailable(update: UpdateAvailable) {
         availableUpdate = update
         checkButton.isEnabled = true
+        completePendingCredentialSave()
         downloadButton.isEnabled = true
         statusText.text = getString(
             if (update.mandatory) R.string.status_available_mandatory else R.string.status_available,
@@ -131,6 +182,13 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
 
     override fun onFailure(error: UpdaterException) {
         checkButton.isEnabled = true
+        saveCredentialsButton.isEnabled = true
+        if (error is MissingApplicationManifestException && pendingCredentials != null) {
+            // The authenticated catalog was downloaded and parsed; only this sample package is absent.
+            completePendingCredentialSave()
+        } else {
+            pendingCredentials = null
+        }
         if (error is InstallPermissionRequiredException) {
             statusText.setText(R.string.status_install_permission)
             installPermission.launch(error.settingsIntent)
@@ -139,8 +197,51 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         }
     }
 
+    private fun completePendingCredentialSave() {
+        val credentials = pendingCredentials ?: return
+        pendingCredentials = null
+        runCatching { credentialsStore.save(credentials) }
+            .onSuccess { renderCredentialState(configured = true) }
+            .onFailure {
+                saveCredentialsButton.isEnabled = true
+                credentialStatusText.setText(R.string.cloudflare_credentials_save_failed)
+            }
+    }
+
+    private fun renderCredentialState(configured: Boolean) {
+        clientIdInput.text.clear()
+        clientSecretInput.text.clear()
+        credentialInputGroup.visibility = if (configured) View.GONE else View.VISIBLE
+        credentialConnectedGroup.visibility = if (configured) View.VISIBLE else View.GONE
+        credentialStatusText.setText(
+            if (configured) R.string.cloudflare_connected else R.string.cloudflare_not_configured,
+        )
+        saveCredentialsButton.isEnabled = true
+    }
+
+    private fun logout() {
+        updater?.close()
+        updater = null
+        pendingCredentials = null
+        credentialsStore.clear()
+        renderCredentialState(configured = false)
+        credentialStatusText.setText(R.string.cloudflare_logged_out)
+        availableUpdate = null
+        downloadedApk = null
+        releaseNotes.text = ""
+        progress.visibility = View.GONE
+        checkButton.isEnabled = true
+        downloadButton.isEnabled = false
+        installButton.isEnabled = false
+    }
+
     override fun onDestroy() {
         updater?.close()
         super.onDestroy()
+    }
+
+    private companion object {
+        const val CF_ACCESS_CLIENT_ID = "CF-Access-Client-Id"
+        const val CF_ACCESS_CLIENT_SECRET = "CF-Access-Client-Secret"
     }
 }

@@ -11,7 +11,7 @@ internal class ManifestRepository(
     private val requests: RequestFactory,
     private val parser: ManifestParser,
 ) {
-    suspend fun fetch(url: HttpUrl): UpdateManifest {
+    suspend fun fetch(url: HttpUrl, applicationId: String): UpdateManifest {
         network.execute(requests.create(url)).use { response ->
             if (!response.isSuccessful) {
                 throw UpdateHttpException(response.code, response.request.url.toString())
@@ -20,7 +20,10 @@ internal class ManifestRepository(
             if (body.contentLength() > MAX_MANIFEST_BYTES) {
                 throw InvalidManifestException("Manifest exceeds the ${MAX_MANIFEST_BYTES}-byte limit")
             }
-            return parser.parse(body.byteStream().readUtf8Limited(MAX_MANIFEST_BYTES))
+            return parser.parse(
+                body = body.byteStream().readUtf8Limited(MAX_MANIFEST_BYTES),
+                applicationId = applicationId,
+            )
         }
     }
 
@@ -51,4 +54,3 @@ internal class ManifestRepository(
         const val MAX_MANIFEST_BYTES = 1_048_576L
     }
 }
-

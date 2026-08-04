@@ -1,5 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
+}
+
+val signingPropertiesFile = rootProject.file("keystore.properties")
+val signingProperties = Properties().apply {
+    if (signingPropertiesFile.isFile) {
+        signingPropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -17,6 +26,23 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        if (signingPropertiesFile.isFile) {
+            create("release") {
+                storeFile = file(signingProperties.getProperty("storeFile"))
+                storePassword = signingProperties.getProperty("storePassword")
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
     }
 }
 

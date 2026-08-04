@@ -12,19 +12,24 @@ verified APK to Android's package installer.
 
 ## Manifest
 
-Both the manifest URL and `apkUrl` must use HTTPS. Redirects are checked as well.
+Both the manifest URL and every selected `apkUrl` must use HTTPS. Redirects are checked as well.
+The root object is keyed by Android application ID. The library automatically selects the entry
+matching `context.packageName`; a missing entry raises `MissingApplicationManifestException`.
+Build variants that add an `applicationIdSuffix` need their suffixed ID represented separately.
 
 ```json
 {
-  "version": "1.2.0",
-  "versionCode": 12,
-  "apkUrl": "https://repo.example.com/app-v1.2.0.apk",
-  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "changelog": [
-    "Added feature X",
-    "Fixed crash Y"
-  ],
-  "mandatory": false
+  "com.example.app": {
+    "version": "1.2.0",
+    "versionCode": 12,
+    "apkUrl": "https://repo.example.com/releases/com.example.app-1.2.0.apk",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "changelog": [
+      "Added feature X",
+      "Fixed crash Y"
+    ],
+    "mandatory": false
+  }
 }
 ```
 
@@ -121,6 +126,17 @@ Install Android SDK Platform 37, use JDK 17, then run:
 The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.0.0`. Adjust the
 root `group` and `version` before publishing to your own Maven repository.
 
+### Release signing
+
+The sample app signs release builds when an ignored `keystore.properties` file is present at the
+repository root. Start from `keystore.properties.example`; keep the real keystore and passwords
+outside Git and back them up securely. Every future update for the same application ID must be
+signed by the same key.
+
 See `sample-app/src/main/java/io/github/selfupdater/sample/MainActivity.kt` for a complete callback
 flow with release notes, a determinate/indeterminate progress indicator, permission handling, and
-installation.
+installation. The sample also demonstrates Cloudflare Access service-token headers. Credentials
+are saved only after the endpoint responds successfully, encrypted with an Android Keystore AES-GCM
+key, and removed from both storage and the updater instance on logout. The credential fields are
+cleared and hidden after saving; the sample disables Android backup and screen capture to reduce
+accidental credential exposure.

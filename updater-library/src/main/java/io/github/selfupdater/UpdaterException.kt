@@ -34,6 +34,12 @@ public class InvalidManifestException(
     cause: Throwable? = null,
 ) : UpdaterException(message, cause)
 
+/** The catalog does not contain an update manifest for the installed application ID. */
+public class MissingApplicationManifestException(
+    /** Package/application ID used to look up the catalog entry. */
+    public val applicationId: String,
+) : UpdaterException("Update catalog has no entry for application ID '$applicationId'")
+
 /** The APK could not be read from or written to app cache. */
 public class UpdateStorageException(
     message: String,
@@ -73,4 +79,3 @@ public class UpdaterClosedException : UpdaterException("Updater has been closed"
 public class UnexpectedUpdaterException(
     cause: Throwable,
 ) : UpdaterException("Unexpected updater failure: ${cause.message ?: cause::class.java.simpleName}", cause)
-

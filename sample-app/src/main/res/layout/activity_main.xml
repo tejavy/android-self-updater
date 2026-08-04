@@ -34,7 +34,88 @@
             android:hint="@string/manifest_hint"
             android:importantForAutofill="no"
             android:inputType="textUri"
-            android:maxLines="2" />
+            android:maxLines="2"
+            android:text="@string/default_manifest_url" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/cloudflare_settings_title"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/cloudflare_settings_description"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Body2" />
+
+        <LinearLayout
+            android:id="@+id/credentialInputGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/clientIdInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/cloudflare_client_id"
+                android:importantForAutofill="no"
+                android:inputType="textVisiblePassword|textNoSuggestions"
+                android:saveEnabled="false"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/clientSecretInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:hint="@string/cloudflare_client_secret"
+                android:importantForAutofill="no"
+                android:inputType="textPassword"
+                android:saveEnabled="false"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/saveCredentialsButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/save_and_connect" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/credentialConnectedGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/cloudflare_connected"
+                android:textAppearance="@style/TextAppearance.MaterialComponents.Body1" />
+
+            <Button
+                android:id="@+id/logoutButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/logout" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/credentialStatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/cloudflare_not_configured"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Caption" />
 
         <Button
             android:id="@+id/checkButton"

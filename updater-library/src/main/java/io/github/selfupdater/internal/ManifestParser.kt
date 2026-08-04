@@ -1,10 +1,10 @@
 package io.github.selfupdater.internal
 
 import io.github.selfupdater.InvalidManifestException
+import io.github.selfupdater.MissingApplicationManifestException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -22,9 +22,11 @@ internal data class UpdateManifest(
 internal class ManifestParser(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    fun parse(body: String): UpdateManifest {
+    fun parse(body: String, applicationId: String): UpdateManifest {
         try {
-            val root = json.parseToJsonElement(body).jsonObject
+            val catalog = json.parseToJsonElement(body).jsonObject
+            val root = catalog[applicationId]?.jsonObject
+                ?: throw MissingApplicationManifestException(applicationId)
             val version = root.requiredString("version").trim()
             val versionCode = root.required("versionCode").jsonPrimitive.long
             val apkUrl = root.requiredString("apkUrl").trim()
@@ -46,6 +48,8 @@ internal class ManifestParser(
 
             return UpdateManifest(version, versionCode, apkUrl, sha256, changelog, mandatory)
         } catch (error: InvalidManifestException) {
+            throw error
+        } catch (error: MissingApplicationManifestException) {
             throw error
         } catch (error: SerializationException) {
             throw InvalidManifestException("Manifest JSON is malformed: ${error.message}", error)
