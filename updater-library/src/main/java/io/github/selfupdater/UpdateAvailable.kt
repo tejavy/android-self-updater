@@ -7,6 +7,8 @@ package io.github.selfupdater
  * [Updater.download] or [Updater.downloadApk] so the library can verify the manifest checksum.
  */
 public class UpdateAvailable internal constructor(
+    /** Package/application ID identifying this entry in the update catalog. */
+    public val applicationId: String,
     /** Human-readable version name, for example `1.2.0`. */
     public val version: String,
     /** Monotonically increasing Android version code. */
@@ -21,6 +23,7 @@ public class UpdateAvailable internal constructor(
 ) {
     override fun equals(other: Any?): Boolean =
         other is UpdateAvailable &&
+            applicationId == other.applicationId &&
             version == other.version &&
             versionCode == other.versionCode &&
             changelog == other.changelog &&
@@ -29,7 +32,8 @@ public class UpdateAvailable internal constructor(
             sha256 == other.sha256
 
     override fun hashCode(): Int {
-        var result = version.hashCode()
+        var result = applicationId.hashCode()
+        result = 31 * result + version.hashCode()
         result = 31 * result + versionCode.hashCode()
         result = 31 * result + changelog.hashCode()
         result = 31 * result + mandatory.hashCode()
@@ -39,6 +43,6 @@ public class UpdateAvailable internal constructor(
     }
 
     override fun toString(): String =
-        "UpdateAvailable(version=$version, versionCode=$versionCode, mandatory=$mandatory, apkUrl=$apkUrl)"
+        "UpdateAvailable(applicationId=$applicationId, version=$version, versionCode=$versionCode, " +
+            "mandatory=$mandatory, apkUrl=$apkUrl)"
 }
-

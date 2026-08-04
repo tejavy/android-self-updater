@@ -37,10 +37,34 @@ class ManifestParserTest {
         )
 
         assertEquals("1.2.0", result.version)
+        assertEquals("com.example.app", result.applicationId)
         assertEquals(12, result.versionCode)
         assertEquals(listOf("Added feature X", "Fixed crash Y"), result.changelog)
         assertFalse(result.mandatory)
         assertEquals(result.sha256.lowercase(), result.sha256)
+    }
+
+    @Test
+    fun `parses every catalog entry in manifest order`() {
+        val result = parser.parseCatalog(
+            """
+            {
+              "com.example.first": {
+                "version":"1.0.0", "versionCode":1,
+                "apkUrl":"https://repo.example.com/first.apk",
+                "sha256":"${"a".repeat(64)}", "changelog":[], "mandatory":false
+              },
+              "com.example.second": {
+                "version":"2.0.0", "versionCode":2,
+                "apkUrl":"https://repo.example.com/second.apk",
+                "sha256":"${"b".repeat(64)}", "changelog":["New"], "mandatory":true
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("com.example.first", "com.example.second"), result.map { it.applicationId })
+        assertEquals("2.0.0", result.last().version)
     }
 
     @Test(expected = InvalidManifestException::class)

@@ -17,6 +17,16 @@ The root object is keyed by Android application ID. The library automatically se
 matching `context.packageName`; a missing entry raises `MissingApplicationManifestException`.
 Build variants that add an `applicationIdSuffix` need their suffixed ID represented separately.
 
+Catalog/dashboard apps can load every entry without applying the host-app version comparison:
+
+```kotlin
+val releases: List<UpdateAvailable> = updater.fetchCatalog()
+```
+
+Each result exposes its `applicationId` and can be passed directly to `downloadApk()` and
+`install()`. Normal app integrations should continue to use `check()` or `checkForUpdate()`, which
+only evaluates the installed app's entry.
+
 ```json
 {
   "com.example.app": {
@@ -123,7 +133,7 @@ Install Android SDK Platform 37, use JDK 17, then run:
 ./gradlew :updater-library:publishToMavenLocal
 ```
 
-The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.0.0`. Adjust the
+The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.2.0`. Adjust the
 root `group` and `version` before publishing to your own Maven repository.
 
 ### Release signing
@@ -133,10 +143,9 @@ repository root. Start from `keystore.properties.example`; keep the real keystor
 outside Git and back them up securely. Every future update for the same application ID must be
 signed by the same key.
 
-See `sample-app/src/main/java/io/github/selfupdater/sample/MainActivity.kt` for a complete callback
-flow with release notes, a determinate/indeterminate progress indicator, permission handling, and
-installation. The sample also demonstrates Cloudflare Access service-token headers. Credentials
-are saved only after the endpoint responds successfully, encrypted with an Android Keystore AES-GCM
-key, and removed from both storage and the updater instance on logout. The credential fields are
-cleared and hidden after saving; the sample disables Android backup and screen capture to reduce
-accidental credential exposure.
+The sample is a small multi-app update dashboard. Its home screen lists every catalog entry with
+release notes and an install action. When signed out it links to a separate settings screen for
+Cloudflare Access service-token headers. Credentials are saved only after the complete catalog
+responds successfully, encrypted with an Android Keystore AES-GCM key, and removed from both
+storage and memory on logout. Saved token values are never rendered again; the sample disables
+Android backup and screen capture to reduce accidental credential exposure.

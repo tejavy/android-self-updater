@@ -116,6 +116,7 @@ public class Updater @JvmOverloads constructor(
                 UpdateCheckResult.NoUpdate
             } else {
                 val update = UpdateAvailable(
+                    applicationId = manifest.applicationId,
                     version = manifest.version,
                     versionCode = manifest.versionCode,
                     changelog = manifest.changelog.toList(),
@@ -130,6 +131,31 @@ public class Updater @JvmOverloads constructor(
             throw error
         } catch (error: Throwable) {
             throw reportFailure(ErrorMapper.map(error, "checking for updates"))
+        }
+    }
+
+    /**
+     * Downloads and validates the complete manifest catalog without comparing entries to the
+     * host app. This is intended for update dashboards that manage multiple application IDs.
+     * Entries retain the manifest order and may be passed directly to [downloadApk] and [install].
+     *
+     * Unlike [checkForUpdate], this method does not publish listener callbacks or update [state].
+     *
+     * @throws UpdaterException when validation, parsing, or networking fails.
+     */
+    public suspend fun fetchCatalog(): List<UpdateAvailable> = operationMutex.withLock {
+        ensureOpen()
+        try {
+            withContext(ioDispatcher) {
+                manifestRepository.fetchCatalog(manifestHttpUrl).map { manifest ->
+                    UrlValidator.requireHttps(manifest.apkUrl)
+                    manifest.toUpdateAvailable()
+                }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            throw ErrorMapper.map(error, "loading the update catalog")
         }
     }
 
@@ -259,6 +285,17 @@ public class Updater @JvmOverloads constructor(
     private fun ensureOpen() {
         if (closed.get()) throw UpdaterClosedException()
     }
+
+    private fun io.github.selfupdater.internal.UpdateManifest.toUpdateAvailable(): UpdateAvailable =
+        UpdateAvailable(
+            applicationId = applicationId,
+            version = version,
+            versionCode = versionCode,
+            changelog = changelog.toList(),
+            mandatory = mandatory,
+            apkUrl = apkUrl,
+            sha256 = sha256,
+        )
 
     /** Fluent alternative to the primary constructor. */
     public class Builder(context: Context) {

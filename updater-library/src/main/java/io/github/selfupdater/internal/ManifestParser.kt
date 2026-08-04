@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 
 internal data class UpdateManifest(
+    val applicationId: String,
     val version: String,
     val versionCode: Long,
     val apkUrl: String,
@@ -27,6 +28,44 @@ internal class ManifestParser(
             val catalog = json.parseToJsonElement(body).jsonObject
             val root = catalog[applicationId]?.jsonObject
                 ?: throw MissingApplicationManifestException(applicationId)
+            return parseEntry(applicationId, root)
+        } catch (error: InvalidManifestException) {
+            throw error
+        } catch (error: MissingApplicationManifestException) {
+            throw error
+        } catch (error: SerializationException) {
+            throw InvalidManifestException("Manifest JSON is malformed: ${error.message}", error)
+        } catch (error: IllegalArgumentException) {
+            throw InvalidManifestException("Manifest contains an invalid value: ${error.message}", error)
+        }
+    }
+
+    fun parseCatalog(body: String): List<UpdateManifest> {
+        try {
+            val catalog = json.parseToJsonElement(body).jsonObject
+            if (catalog.isEmpty()) throw InvalidManifestException("Update catalog cannot be empty")
+            return catalog.map { (applicationId, element) ->
+                if (applicationId.isBlank()) {
+                    throw InvalidManifestException("Application ID cannot be blank")
+                }
+                parseEntry(applicationId, element.jsonObject)
+            }
+        } catch (error: InvalidManifestException) {
+            throw error
+        } catch (error: MissingApplicationManifestException) {
+            throw error
+        } catch (error: SerializationException) {
+            throw InvalidManifestException("Manifest JSON is malformed: ${error.message}", error)
+        } catch (error: IllegalArgumentException) {
+            throw InvalidManifestException("Manifest contains an invalid value: ${error.message}", error)
+        }
+    }
+
+    private fun parseEntry(
+        applicationId: String,
+        root: kotlinx.serialization.json.JsonObject,
+    ): UpdateManifest {
+        try {
             val version = root.requiredString("version").trim()
             val versionCode = root.required("versionCode").jsonPrimitive.long
             val apkUrl = root.requiredString("apkUrl").trim()
@@ -46,7 +85,7 @@ internal class ManifestParser(
                 throw InvalidManifestException("sha256 must contain exactly 64 hexadecimal characters")
             }
 
-            return UpdateManifest(version, versionCode, apkUrl, sha256, changelog, mandatory)
+            return UpdateManifest(applicationId, version, versionCode, apkUrl, sha256, changelog, mandatory)
         } catch (error: InvalidManifestException) {
             throw error
         } catch (error: MissingApplicationManifestException) {

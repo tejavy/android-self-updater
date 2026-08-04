@@ -1,48 +1,47 @@
 package io.github.selfupdater.sample
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import io.github.selfupdater.InstallPermissionRequiredException
-import io.github.selfupdater.MissingApplicationManifestException
 import io.github.selfupdater.UpdateAvailable
 import io.github.selfupdater.Updater
 import io.github.selfupdater.UpdaterException
 import io.github.selfupdater.UpdaterListener
 import java.io.File
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), UpdaterListener {
-    private lateinit var manifestUrl: EditText
-    private lateinit var checkButton: Button
-    private lateinit var downloadButton: Button
-    private lateinit var installButton: Button
-    private lateinit var statusText: TextView
-    private lateinit var releaseNotes: TextView
-    private lateinit var progress: ProgressBar
-    private lateinit var credentialInputGroup: View
-    private lateinit var credentialConnectedGroup: View
-    private lateinit var clientIdInput: EditText
-    private lateinit var clientSecretInput: EditText
-    private lateinit var saveCredentialsButton: Button
-    private lateinit var logoutButton: Button
-    private lateinit var credentialStatusText: TextView
     private lateinit var credentialsStore: CloudflareCredentialsStore
+    private lateinit var adapter: CatalogAdapter
+    private lateinit var signedOutGroup: View
+    private lateinit var contentGroup: View
+    private lateinit var loading: ProgressBar
+    private lateinit var errorText: TextView
+    private lateinit var retryButton: Button
 
     private var updater: Updater? = null
-    private var availableUpdate: UpdateAvailable? = null
+    private var activeUpdate: UpdateAvailable? = null
     private var downloadedApk: File? = null
-    private var pendingCredentials: CloudflareAccessCredentials? = null
+    private var installerLaunched = false
+
+    private val settings = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { renderSession() }
 
     private val installPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
-        val update = availableUpdate
+        val update = activeUpdate
         val apk = downloadedApk
         if (update != null && apk != null) updater?.installAsync(update, apk)
     }
@@ -52,196 +51,135 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_main)
 
-        manifestUrl = findViewById(R.id.manifestUrl)
-        checkButton = findViewById(R.id.checkButton)
-        downloadButton = findViewById(R.id.downloadButton)
-        installButton = findViewById(R.id.installButton)
-        statusText = findViewById(R.id.statusText)
-        releaseNotes = findViewById(R.id.releaseNotes)
-        progress = findViewById(R.id.downloadProgress)
-        credentialInputGroup = findViewById(R.id.credentialInputGroup)
-        credentialConnectedGroup = findViewById(R.id.credentialConnectedGroup)
-        clientIdInput = findViewById(R.id.clientIdInput)
-        clientSecretInput = findViewById(R.id.clientSecretInput)
-        saveCredentialsButton = findViewById(R.id.saveCredentialsButton)
-        logoutButton = findViewById(R.id.logoutButton)
-        credentialStatusText = findViewById(R.id.credentialStatusText)
         credentialsStore = CloudflareCredentialsStore(applicationContext)
+        signedOutGroup = findViewById(R.id.signedOutGroup)
+        contentGroup = findViewById(R.id.contentGroup)
+        loading = findViewById(R.id.catalogLoading)
+        errorText = findViewById(R.id.catalogError)
+        retryButton = findViewById(R.id.retryButton)
+        adapter = CatalogAdapter(::startInstallFlow)
+        findViewById<RecyclerView>(R.id.appList).apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = this@MainActivity.adapter
+        }
 
-        renderCredentialState(credentialsStore.load() != null)
-        checkButton.setOnClickListener {
-            pendingCredentials = null
-            val credentials = credentialsStore.load()
-            if (credentials == null) renderCredentialState(configured = false)
-            startCheck(credentials)
-        }
-        saveCredentialsButton.setOnClickListener { saveAndConnect() }
-        logoutButton.setOnClickListener { logout() }
-        downloadButton.setOnClickListener {
-            availableUpdate?.let { update -> updater?.download(update) }
-        }
-        installButton.setOnClickListener {
-            val update = availableUpdate
-            val apk = downloadedApk
-            if (update != null && apk != null) updater?.installAsync(update, apk)
+        findViewById<Button>(R.id.settingsButton).setOnClickListener { openSettings() }
+        findViewById<Button>(R.id.configureAccessButton).setOnClickListener { openSettings() }
+        retryButton.setOnClickListener { loadCatalog() }
+        renderSession()
+    }
+
+    private fun openSettings() {
+        settings.launch(Intent(this, SettingsActivity::class.java))
+    }
+
+    private fun renderSession() {
+        if (credentialsStore.load() == null) {
+            updater?.close()
+            updater = null
+            adapter.submitList(emptyList())
+            signedOutGroup.visibility = View.VISIBLE
+            contentGroup.visibility = View.GONE
+        } else {
+            signedOutGroup.visibility = View.GONE
+            contentGroup.visibility = View.VISIBLE
+            loadCatalog()
         }
     }
 
-    private fun saveAndConnect() {
-        val clientId = clientIdInput.text.toString().trim()
-        val clientSecret = clientSecretInput.text.toString().trim()
-        if (clientId.isEmpty() || clientSecret.isEmpty()) {
-            credentialStatusText.setText(R.string.cloudflare_credentials_required)
-            return
-        }
-        val credentials = CloudflareAccessCredentials(clientId, clientSecret)
-        pendingCredentials = credentials
-        startCheck(credentials)
-    }
-
-    private fun startCheck(credentials: CloudflareAccessCredentials?) {
+    private fun loadCatalog() {
+        val credentials = credentialsStore.load() ?: return renderSession()
         updater?.close()
-        availableUpdate = null
+        activeUpdate = null
         downloadedApk = null
-        releaseNotes.text = ""
-        downloadButton.isEnabled = false
-        installButton.isEnabled = false
-        progress.visibility = View.GONE
+        adapter.submitList(emptyList())
+        showLoading()
 
-        updater = runCatching {
-            Updater.Builder(applicationContext)
-                .manifestUrl(manifestUrl.text.toString().trim())
-                .listener(this)
-                .requestTimeoutSeconds(30)
-                .apply {
-                    if (credentials != null) {
-                        header(CF_ACCESS_CLIENT_ID, credentials.clientId)
-                        header(CF_ACCESS_CLIENT_SECRET, credentials.clientSecret)
-                    }
+        val instance = UpdateConfiguration.updater(applicationContext, credentials) {
+            listener(this@MainActivity)
+        }
+        updater = instance
+        lifecycleScope.launch {
+            runCatching { instance.fetchCatalog() }
+                .onSuccess { entries ->
+                    if (updater !== instance) return@onSuccess
+                    loading.visibility = View.GONE
+                    adapter.submitList(entries)
+                    findViewById<TextView>(R.id.appCount).text = resources.getQuantityString(
+                        R.plurals.app_count,
+                        entries.size,
+                        entries.size,
+                    )
                 }
-                .build()
-        }.getOrElse { error ->
-            pendingCredentials = null
-            saveCredentialsButton.isEnabled = true
-            statusText.text = error.message ?: getString(R.string.status_invalid_configuration)
-            return
-        }
-        updater?.check()
-    }
-
-    override fun onChecking() {
-        checkButton.isEnabled = false
-        saveCredentialsButton.isEnabled = false
-        statusText.setText(R.string.status_checking)
-    }
-
-    override fun onNoUpdate() {
-        checkButton.isEnabled = true
-        completePendingCredentialSave()
-        statusText.setText(R.string.status_current)
-    }
-
-    override fun onUpdateAvailable(update: UpdateAvailable) {
-        availableUpdate = update
-        checkButton.isEnabled = true
-        completePendingCredentialSave()
-        downloadButton.isEnabled = true
-        statusText.text = getString(
-            if (update.mandatory) R.string.status_available_mandatory else R.string.status_available,
-            update.version,
-            update.versionCode,
-        )
-        releaseNotes.text = update.changelog.joinToString(separator = "\n") {
-            getString(R.string.release_note_bullet, it)
+                .onFailure { error ->
+                    if (updater !== instance) return@onFailure
+                    loading.visibility = View.GONE
+                    errorText.visibility = View.VISIBLE
+                    errorText.text = error.message ?: getString(R.string.catalog_load_failed)
+                    retryButton.visibility = View.VISIBLE
+                }
         }
     }
+
+    private fun showLoading() {
+        loading.visibility = View.VISIBLE
+        errorText.visibility = View.GONE
+        retryButton.visibility = View.GONE
+        findViewById<TextView>(R.id.appCount).setText(R.string.loading_catalog)
+    }
+
+    private fun startInstallFlow(update: UpdateAvailable) {
+        if (activeUpdate != null) return
+        activeUpdate = update
+        downloadedApk = null
+        adapter.setOperationsEnabled(false)
+        adapter.markDownloading(update.applicationId, -1)
+        updater?.download(update)
+    }
+
+    override fun onChecking() = Unit
+    override fun onNoUpdate() = Unit
+    override fun onUpdateAvailable(update: UpdateAvailable) = Unit
 
     override fun onDownloadProgress(percent: Int) {
-        progress.visibility = View.VISIBLE
-        progress.isIndeterminate = percent < 0
-        if (percent >= 0) {
-            progress.progress = percent
-            statusText.text = getString(R.string.status_downloading_progress, percent)
-        } else {
-            statusText.setText(R.string.status_downloading)
-        }
+        activeUpdate?.let { adapter.markDownloading(it.applicationId, percent) }
     }
 
     override fun onDownloadComplete(apkFile: File) {
+        val update = activeUpdate ?: return
         downloadedApk = apkFile
-        downloadButton.isEnabled = false
-        installButton.isEnabled = true
-        progress.isIndeterminate = false
-        progress.progress = 100
-        statusText.setText(R.string.status_download_verified)
+        adapter.markInstalling(update.applicationId)
+        updater?.installAsync(update, apkFile)
     }
 
     override fun onInstalling() {
-        statusText.setText(R.string.status_installing)
+        installerLaunched = true
+        activeUpdate?.let { adapter.markInstalling(it.applicationId) }
     }
 
     override fun onFailure(error: UpdaterException) {
-        checkButton.isEnabled = true
-        saveCredentialsButton.isEnabled = true
-        if (error is MissingApplicationManifestException && pendingCredentials != null) {
-            // The authenticated catalog was downloaded and parsed; only this sample package is absent.
-            completePendingCredentialSave()
-        } else {
-            pendingCredentials = null
-        }
+        val update = activeUpdate ?: return
         if (error is InstallPermissionRequiredException) {
-            statusText.setText(R.string.status_install_permission)
+            adapter.markWaitingForPermission(update.applicationId)
             installPermission.launch(error.settingsIntent)
         } else {
-            statusText.text = error.message ?: getString(R.string.status_update_failed)
+            adapter.markFailed(update.applicationId, error.message ?: getString(R.string.install_failed))
+            activeUpdate = null
+            downloadedApk = null
+            adapter.setOperationsEnabled(true)
         }
     }
 
-    private fun completePendingCredentialSave() {
-        val credentials = pendingCredentials ?: return
-        pendingCredentials = null
-        runCatching { credentialsStore.save(credentials) }
-            .onSuccess { renderCredentialState(configured = true) }
-            .onFailure {
-                saveCredentialsButton.isEnabled = true
-                credentialStatusText.setText(R.string.cloudflare_credentials_save_failed)
-            }
-    }
-
-    private fun renderCredentialState(configured: Boolean) {
-        clientIdInput.text.clear()
-        clientSecretInput.text.clear()
-        credentialInputGroup.visibility = if (configured) View.GONE else View.VISIBLE
-        credentialConnectedGroup.visibility = if (configured) View.VISIBLE else View.GONE
-        credentialStatusText.setText(
-            if (configured) R.string.cloudflare_connected else R.string.cloudflare_not_configured,
-        )
-        saveCredentialsButton.isEnabled = true
-    }
-
-    private fun logout() {
-        updater?.close()
-        updater = null
-        pendingCredentials = null
-        credentialsStore.clear()
-        renderCredentialState(configured = false)
-        credentialStatusText.setText(R.string.cloudflare_logged_out)
-        availableUpdate = null
-        downloadedApk = null
-        releaseNotes.text = ""
-        progress.visibility = View.GONE
-        checkButton.isEnabled = true
-        downloadButton.isEnabled = false
-        installButton.isEnabled = false
+    override fun onResume() {
+        super.onResume()
+        if (installerLaunched) {
+            installerLaunched = false
+            renderSession()
+        }
     }
 
     override fun onDestroy() {
         updater?.close()
         super.onDestroy()
-    }
-
-    private companion object {
-        const val CF_ACCESS_CLIENT_ID = "CF-Access-Client-Id"
-        const val CF_ACCESS_CLIENT_SECRET = "CF-Access-Client-Secret"
     }
 }

@@ -25,8 +25,9 @@ internal class ApkDownloader(
     ): File {
         val directory = File(cacheDirectory, CACHE_FOLDER)
         ensureDirectory(directory)
-        val finalFile = File(directory, "update-${update.versionCode}.apk")
-        val partialFile = File(directory, "update-${update.versionCode}.apk.part")
+        val cacheKey = "${update.versionCode}-${update.sha256.take(12)}"
+        val finalFile = File(directory, "update-$cacheKey.apk")
+        val partialFile = File(directory, "update-$cacheKey.apk.part")
         cleanOldFiles(directory, finalFile, partialFile)
 
         if (finalFile.exists()) {
