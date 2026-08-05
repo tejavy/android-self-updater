@@ -133,7 +133,7 @@ Install Android SDK Platform 37, use JDK 17, then run:
 ./gradlew :updater-library:publishToMavenLocal
 ```
 
-The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.2.0`. Adjust the
+The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.2.1`. Adjust the
 root `group` and `version` before publishing to your own Maven repository.
 
 ### Release signing

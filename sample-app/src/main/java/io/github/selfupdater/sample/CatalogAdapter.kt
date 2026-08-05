@@ -17,10 +17,12 @@ internal class CatalogAdapter(
     private var operationsEnabled = true
 
     fun submitList(newEntries: List<UpdateAvailable>) {
+        val previousSize = entries.size
         entries.clear()
+        if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
         entries.addAll(newEntries)
         states.keys.retainAll(newEntries.mapTo(mutableSetOf()) { it.applicationId })
-        notifyDataSetChanged()
+        if (newEntries.isNotEmpty()) notifyItemRangeInserted(0, newEntries.size)
     }
 
     fun markDownloading(applicationId: String, percent: Int) = updateState(
@@ -42,7 +44,7 @@ internal class CatalogAdapter(
 
     fun setOperationsEnabled(enabled: Boolean) {
         operationsEnabled = enabled
-        notifyDataSetChanged()
+        if (entries.isNotEmpty()) notifyItemRangeChanged(0, entries.size)
     }
 
     private fun updateState(applicationId: String, state: RowState) {
