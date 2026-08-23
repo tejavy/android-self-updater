@@ -19,8 +19,8 @@ android {
         applicationId = "io.github.selfupdater.sample"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.2.1"
+        versionCode = 5
+        versionName = "1.3.0"
     }
 
     compileOptions {
@@ -48,9 +48,10 @@ android {
 
 dependencies {
     implementation(project(":updater-library"))
-    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("com.google.android.material:material:1.14.0")
+    testImplementation("junit:junit:4.13.2")
 }

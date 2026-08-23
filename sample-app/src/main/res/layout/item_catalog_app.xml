@@ -82,6 +82,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:text="@string/download_and_install" />
+            android:text="@string/install_app" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

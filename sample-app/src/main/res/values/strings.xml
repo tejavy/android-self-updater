@@ -16,11 +16,15 @@
     <string name="loading_catalog">Loading app catalog…</string>
     <string name="catalog_load_failed">Could not load the app catalog.</string>
     <string name="retry">Retry</string>
-    <string name="version_and_code">Version %1$s · code %2$d</string>
+    <string name="available_version">Available: %1$s (code %2$d) · Not installed</string>
+    <string name="available_and_installed_version">Available: %1$s (code %2$d)\nInstalled: %3$s (code %4$d)</string>
+    <string name="unknown_version_name">Unknown</string>
     <string name="mandatory">Mandatory</string>
     <string name="no_release_notes">No release notes provided.</string>
     <string name="release_note_bullet">• %1$s</string>
-    <string name="download_and_install">Download and install</string>
+    <string name="install_app">Install app</string>
+    <string name="reinstall_app">Re-install app</string>
+    <string name="download_and_install_update">Download and install update</string>
     <string name="retry_install">Try again</string>
     <string name="downloading">Downloading…</string>
     <string name="downloading_percent">Downloading… %1$d%%</string>

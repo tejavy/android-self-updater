@@ -133,7 +133,7 @@ Install Android SDK Platform 37, use JDK 17, then run:
 ./gradlew :updater-library:publishToMavenLocal
 ```
 
-The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.2.1`. Adjust the
+The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.3.0`. Adjust the
 root `group` and `version` before publishing to your own Maven repository.
 
 ### Release signing
@@ -149,3 +149,9 @@ Cloudflare Access service-token headers. Credentials are saved only after the co
 responds successfully, encrypted with an Android Keystore AES-GCM key, and removed from both
 storage and memory on logout. Saved token values are never rendered again; the sample disables
 Android backup and screen capture to reduce accidental credential exposure.
+
+The dashboard compares each catalog `versionCode` with the version currently installed on the
+device. A higher catalog version gets a green update action; equal or older catalog versions get a
+blue **Re-install app** action, and packages not present on the device get a blue install action.
+Because catalog application IDs are server-defined, the sample declares `QUERY_ALL_PACKAGES` to
+perform these checks reliably on Android 11 and newer. The version lookup stays entirely on-device.

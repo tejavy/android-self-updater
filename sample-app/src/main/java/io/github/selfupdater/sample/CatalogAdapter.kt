@@ -1,27 +1,29 @@
 package io.github.selfupdater.sample
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import io.github.selfupdater.UpdateAvailable
 
 internal class CatalogAdapter(
     private val onInstall: (UpdateAvailable) -> Unit,
 ) : RecyclerView.Adapter<CatalogAdapter.AppViewHolder>() {
-    private val entries = mutableListOf<UpdateAvailable>()
+    private val entries = mutableListOf<CatalogApp>()
     private val states = mutableMapOf<String, RowState>()
     private var operationsEnabled = true
 
-    fun submitList(newEntries: List<UpdateAvailable>) {
+    fun submitList(newEntries: List<CatalogApp>) {
         val previousSize = entries.size
         entries.clear()
         if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
         entries.addAll(newEntries)
-        states.keys.retainAll(newEntries.mapTo(mutableSetOf()) { it.applicationId })
+        states.keys.retainAll(newEntries.mapTo(mutableSetOf()) { it.release.applicationId })
         if (newEntries.isNotEmpty()) notifyItemRangeInserted(0, newEntries.size)
     }
 
@@ -49,7 +51,7 @@ internal class CatalogAdapter(
 
     private fun updateState(applicationId: String, state: RowState) {
         states[applicationId] = state
-        val index = entries.indexOfFirst { it.applicationId == applicationId }
+        val index = entries.indexOfFirst { it.release.applicationId == applicationId }
         if (index >= 0) notifyItemChanged(index)
     }
 
@@ -59,7 +61,7 @@ internal class CatalogAdapter(
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val entry = entries[position]
-        holder.bind(entry, states[entry.applicationId] ?: RowState.Idle)
+        holder.bind(entry, states[entry.release.applicationId] ?: RowState.Idle)
     }
 
     override fun getItemCount(): Int = entries.size
@@ -72,25 +74,49 @@ internal class CatalogAdapter(
         private val progress: ProgressBar = view.findViewById(R.id.downloadProgress)
         private val status: TextView = view.findViewById(R.id.rowStatus)
         private val action: Button = view.findViewById(R.id.installButton)
+        private val defaultButtonTint: ColorStateList? = action.backgroundTintList
+        private val updateButtonTint: ColorStateList =
+            ContextCompat.getColorStateList(view.context, R.color.button_update_tint)
+                ?: ColorStateList.valueOf(ContextCompat.getColor(view.context, R.color.update_green))
 
-        fun bind(entry: UpdateAvailable, state: RowState) {
+        fun bind(entry: CatalogApp, state: RowState) {
             val context = itemView.context
-            appId.text = entry.applicationId
-            version.text = context.getString(R.string.version_and_code, entry.version, entry.versionCode)
-            mandatory.visibility = if (entry.mandatory) View.VISIBLE else View.GONE
-            notes.text = if (entry.changelog.isEmpty()) {
+            val release = entry.release
+            appId.text = release.applicationId
+            version.text = entry.installedVersion?.let { installed ->
+                context.getString(
+                    R.string.available_and_installed_version,
+                    release.version,
+                    release.versionCode,
+                    installed.versionName ?: context.getString(R.string.unknown_version_name),
+                    installed.versionCode,
+                )
+            } ?: context.getString(R.string.available_version, release.version, release.versionCode)
+            mandatory.visibility = if (release.mandatory) View.VISIBLE else View.GONE
+            notes.text = if (release.changelog.isEmpty()) {
                 context.getString(R.string.no_release_notes)
             } else {
-                entry.changelog.joinToString("\n") { context.getString(R.string.release_note_bullet, it) }
+                release.changelog.joinToString("\n") { context.getString(R.string.release_note_bullet, it) }
             }
 
-            action.setOnClickListener { onInstall(entry) }
+            action.backgroundTintList = if (entry.action == CatalogAction.Update) {
+                updateButtonTint
+            } else {
+                defaultButtonTint
+            }
+            action.setOnClickListener { onInstall(release) }
             when (state) {
                 RowState.Idle -> {
                     progress.visibility = View.GONE
                     status.visibility = View.GONE
                     action.isEnabled = operationsEnabled
-                    action.setText(R.string.download_and_install)
+                    action.setText(
+                        when (entry.action) {
+                            CatalogAction.Install -> R.string.install_app
+                            CatalogAction.Reinstall -> R.string.reinstall_app
+                            CatalogAction.Update -> R.string.download_and_install_update
+                        },
+                    )
                 }
                 is RowState.Downloading -> {
                     progress.visibility = View.VISIBLE

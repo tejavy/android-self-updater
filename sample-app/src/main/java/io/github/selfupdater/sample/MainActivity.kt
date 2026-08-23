@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), UpdaterListener {
     private lateinit var credentialsStore: CloudflareCredentialsStore
+    private lateinit var installedAppResolver: InstalledAppResolver
     private lateinit var adapter: CatalogAdapter
     private lateinit var signedOutGroup: View
     private lateinit var contentGroup: View
@@ -52,6 +53,7 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         setContentView(R.layout.activity_main)
 
         credentialsStore = CloudflareCredentialsStore(applicationContext)
+        installedAppResolver = InstalledAppResolver(applicationContext)
         signedOutGroup = findViewById(R.id.signedOutGroup)
         contentGroup = findViewById(R.id.contentGroup)
         loading = findViewById(R.id.catalogLoading)
@@ -104,7 +106,7 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
                 .onSuccess { entries ->
                     if (updater !== instance) return@onSuccess
                     loading.visibility = View.GONE
-                    adapter.submitList(entries)
+                    adapter.submitList(installedAppResolver.resolve(entries))
                     findViewById<TextView>(R.id.appCount).text = resources.getQuantityString(
                         R.plurals.app_count,
                         entries.size,
