@@ -2,4 +2,13 @@
 <resources>
     <color name="update_green">#18864B</color>
     <color name="button_disabled">#9E9E9E</color>
+    <color name="update_badge_background">#D9F4E5</color>
+    <color name="update_badge_text">#0B6435</color>
+    <color name="current_badge_background">#E2EAF8</color>
+    <color name="current_badge_text">#24477F</color>
+    <color name="not_installed_badge_background">#ECEEF2</color>
+    <color name="not_installed_badge_text">#50545C</color>
+    <color name="newer_badge_background">#FFF0CF</color>
+    <color name="newer_badge_text">#725500</color>
+    <color name="mandatory_text">#8A1C1C</color>
 </resources>

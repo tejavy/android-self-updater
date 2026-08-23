@@ -3,10 +3,13 @@ package io.github.selfupdater.sample
 import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import android.os.Build
 import io.github.selfupdater.UpdateAvailable
 
 internal data class InstalledAppVersion(
+    val displayName: String,
+    val icon: Drawable,
     val versionName: String?,
     val versionCode: Long,
 )
@@ -15,6 +18,10 @@ internal data class CatalogApp(
     val release: UpdateAvailable,
     val installedVersion: InstalledAppVersion?,
 ) {
+    val displayName: String = installedVersion?.displayName
+        ?: release.displayName
+        ?: release.applicationId
+
     val action: CatalogAction = classifyCatalogAction(
         installedVersionCode = installedVersion?.versionCode,
         availableVersionCode = release.versionCode,
@@ -25,6 +32,7 @@ internal enum class CatalogAction {
     Install,
     Reinstall,
     Update,
+    NewerInstalled,
 }
 
 internal fun classifyCatalogAction(
@@ -33,24 +41,43 @@ internal fun classifyCatalogAction(
 ): CatalogAction = when {
     installedVersionCode == null -> CatalogAction.Install
     availableVersionCode > installedVersionCode -> CatalogAction.Update
-    else -> CatalogAction.Reinstall
+    availableVersionCode == installedVersionCode -> CatalogAction.Reinstall
+    else -> CatalogAction.NewerInstalled
 }
 
 /** Reads versions for catalog packages without starting or modifying those applications. */
 internal class InstalledAppResolver(context: Context) {
     private val packageManager = context.packageManager
 
-    fun resolve(releases: List<UpdateAvailable>): List<CatalogApp> = releases.map { release ->
-        CatalogApp(
-            release = release,
-            installedVersion = packageInfo(release.applicationId)?.let { info ->
-                InstalledAppVersion(
-                    versionName = info.versionName,
-                    versionCode = info.compatLongVersionCode,
-                )
-            },
+    fun resolve(releases: List<UpdateAvailable>): List<CatalogApp> = releases
+        .map { release ->
+            CatalogApp(
+                release = release,
+                installedVersion = packageInfo(release.applicationId)?.let { info ->
+                    info.applicationInfo?.let { applicationInfo ->
+                        InstalledAppVersion(
+                            displayName = applicationInfo.loadLabel(packageManager)
+                                .toString()
+                                .takeIf(String::isNotBlank)
+                                ?: release.displayName
+                                ?: release.applicationId,
+                            icon = applicationInfo.loadIcon(packageManager),
+                            versionName = info.versionName,
+                            versionCode = info.compatLongVersionCode,
+                        )
+                    }
+                },
+            )
+        }
+        .sortedWith(
+            compareBy<CatalogApp> { app ->
+                when (app.action) {
+                    CatalogAction.Update -> 0
+                    CatalogAction.Reinstall, CatalogAction.NewerInstalled -> 1
+                    CatalogAction.Install -> 2
+                }
+            }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName },
         )
-    }
 
     private fun packageInfo(applicationId: String): PackageInfo? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

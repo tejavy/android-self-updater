@@ -1,10 +1,12 @@
 package io.github.selfupdater.sample
 
 import android.content.res.ColorStateList
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -16,14 +18,27 @@ internal class CatalogAdapter(
 ) : RecyclerView.Adapter<CatalogAdapter.AppViewHolder>() {
     private val entries = mutableListOf<CatalogApp>()
     private val states = mutableMapOf<String, RowState>()
+    private val expandedNotes = mutableSetOf<String>()
     private var operationsEnabled = true
+
+    init {
+        setHasStableIds(true)
+    }
+
+    val hasItems: Boolean
+        get() = entries.isNotEmpty()
+
+    val updateCount: Int
+        get() = entries.count { it.action == CatalogAction.Update }
 
     fun submitList(newEntries: List<CatalogApp>) {
         val previousSize = entries.size
         entries.clear()
         if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
         entries.addAll(newEntries)
-        states.keys.retainAll(newEntries.mapTo(mutableSetOf()) { it.release.applicationId })
+        val applicationIds = newEntries.mapTo(mutableSetOf()) { it.release.applicationId }
+        states.keys.retainAll(applicationIds)
+        expandedNotes.retainAll(applicationIds)
         if (newEntries.isNotEmpty()) notifyItemRangeInserted(0, newEntries.size)
     }
 
@@ -66,11 +81,17 @@ internal class CatalogAdapter(
 
     override fun getItemCount(): Int = entries.size
 
+    override fun getItemId(position: Int): Long = entries[position].release.applicationId.hashCode().toLong()
+
     inner class AppViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val appIcon: ImageView = view.findViewById(R.id.appIcon)
+        private val displayName: TextView = view.findViewById(R.id.displayName)
         private val appId: TextView = view.findViewById(R.id.applicationId)
         private val version: TextView = view.findViewById(R.id.version)
+        private val statusBadge: TextView = view.findViewById(R.id.statusBadge)
         private val mandatory: TextView = view.findViewById(R.id.mandatoryBadge)
         private val notes: TextView = view.findViewById(R.id.releaseNotes)
+        private val notesToggle: Button = view.findViewById(R.id.notesToggle)
         private val progress: ProgressBar = view.findViewById(R.id.downloadProgress)
         private val status: TextView = view.findViewById(R.id.rowStatus)
         private val action: Button = view.findViewById(R.id.installButton)
@@ -82,7 +103,10 @@ internal class CatalogAdapter(
         fun bind(entry: CatalogApp, state: RowState) {
             val context = itemView.context
             val release = entry.release
+            displayName.text = entry.displayName
             appId.text = release.applicationId
+            entry.installedVersion?.icon?.let(appIcon::setImageDrawable)
+                ?: appIcon.setImageResource(R.drawable.ic_app_placeholder)
             version.text = entry.installedVersion?.let { installed ->
                 context.getString(
                     R.string.available_and_installed_version,
@@ -93,11 +117,20 @@ internal class CatalogAdapter(
                 )
             } ?: context.getString(R.string.available_version, release.version, release.versionCode)
             mandatory.visibility = if (release.mandatory) View.VISIBLE else View.GONE
-            notes.text = if (release.changelog.isEmpty()) {
+            bindStatusBadge(entry.action)
+            val releaseNotes = if (release.changelog.isEmpty()) {
                 context.getString(R.string.no_release_notes)
             } else {
                 release.changelog.joinToString("\n") { context.getString(R.string.release_note_bullet, it) }
             }
+            notes.text = releaseNotes
+            val canExpand = release.changelog.size > COLLAPSED_NOTE_COUNT || releaseNotes.length > LONG_NOTES_LENGTH
+            val isExpanded = release.applicationId in expandedNotes
+            notes.maxLines = if (isExpanded) Integer.MAX_VALUE else COLLAPSED_NOTE_LINES
+            notes.ellipsize = if (isExpanded) null else TextUtils.TruncateAt.END
+            notesToggle.visibility = if (canExpand) View.VISIBLE else View.GONE
+            notesToggle.setText(if (isExpanded) R.string.show_less else R.string.show_more)
+            notesToggle.setOnClickListener { toggleNotes(release.applicationId) }
 
             action.backgroundTintList = if (entry.action == CatalogAction.Update) {
                 updateButtonTint
@@ -115,8 +148,10 @@ internal class CatalogAdapter(
                             CatalogAction.Install -> R.string.install_app
                             CatalogAction.Reinstall -> R.string.reinstall_app
                             CatalogAction.Update -> R.string.download_and_install_update
+                            CatalogAction.NewerInstalled -> R.string.installed_version_newer
                         },
                     )
+                    if (entry.action == CatalogAction.NewerInstalled) action.isEnabled = false
                 }
                 is RowState.Downloading -> {
                     progress.visibility = View.VISIBLE
@@ -154,6 +189,41 @@ internal class CatalogAdapter(
                 }
             }
         }
+
+        private fun bindStatusBadge(action: CatalogAction) {
+            val context = itemView.context
+            val (text, background, color) = when (action) {
+                CatalogAction.Update -> Triple(
+                    R.string.update_available,
+                    R.drawable.badge_update,
+                    R.color.update_badge_text,
+                )
+                CatalogAction.Reinstall -> Triple(
+                    R.string.up_to_date,
+                    R.drawable.badge_current,
+                    R.color.current_badge_text,
+                )
+                CatalogAction.Install -> Triple(
+                    R.string.not_installed,
+                    R.drawable.badge_not_installed,
+                    R.color.not_installed_badge_text,
+                )
+                CatalogAction.NewerInstalled -> Triple(
+                    R.string.newer_version_installed,
+                    R.drawable.badge_newer,
+                    R.color.newer_badge_text,
+                )
+            }
+            statusBadge.setText(text)
+            statusBadge.setBackgroundResource(background)
+            statusBadge.setTextColor(ContextCompat.getColor(context, color))
+        }
+    }
+
+    private fun toggleNotes(applicationId: String) {
+        if (!expandedNotes.add(applicationId)) expandedNotes.remove(applicationId)
+        val index = entries.indexOfFirst { it.release.applicationId == applicationId }
+        if (index >= 0) notifyItemChanged(index)
     }
 
     internal sealed interface RowState {
@@ -162,5 +232,11 @@ internal class CatalogAdapter(
         data object Installing : RowState
         data object WaitingForPermission : RowState
         data class Failed(val message: String) : RowState
+    }
+
+    private companion object {
+        const val COLLAPSED_NOTE_COUNT = 3
+        const val COLLAPSED_NOTE_LINES = 3
+        const val LONG_NOTES_LENGTH = 180
     }
 }

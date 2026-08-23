@@ -15,8 +15,8 @@ class CatalogActionTest {
     }
 
     @Test
-    fun `offers reinstall when installed version is newer`() {
-        assertEquals(CatalogAction.Reinstall, classifyCatalogAction(13, 12))
+    fun `blocks reinstall when installed version is newer`() {
+        assertEquals(CatalogAction.NewerInstalled, classifyCatalogAction(13, 12))
     }
 
     @Test

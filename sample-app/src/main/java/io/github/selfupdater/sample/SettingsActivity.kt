@@ -9,6 +9,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.appbar.MaterialToolbar
 import io.github.selfupdater.Updater
 import kotlinx.coroutines.launch
 
@@ -27,6 +28,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_settings)
+        applyEdgeToEdgeInsets(findViewById(R.id.settingsRoot))
 
         store = CloudflareCredentialsStore(applicationContext)
         inputGroup = findViewById(R.id.credentialInputGroup)
@@ -37,7 +39,7 @@ class SettingsActivity : AppCompatActivity() {
         progress = findViewById(R.id.connectionProgress)
         status = findViewById(R.id.credentialStatusText)
 
-        findViewById<Button>(R.id.backButton).setOnClickListener { finish() }
+        findViewById<MaterialToolbar>(R.id.settingsToolbar).setNavigationOnClickListener { finish() }
         saveButton.setOnClickListener { saveAndConnect() }
         findViewById<Button>(R.id.logoutButton).setOnClickListener { logout() }
         render(store.load() != null)
@@ -89,6 +91,7 @@ class SettingsActivity : AppCompatActivity() {
         inputGroup.visibility = if (configured) View.GONE else View.VISIBLE
         connectedGroup.visibility = if (configured) View.VISIBLE else View.GONE
         progress.visibility = View.GONE
+        status.visibility = if (configured) View.GONE else View.VISIBLE
         status.setText(if (configured) R.string.cloudflare_connected else R.string.cloudflare_not_configured)
         saveButton.isEnabled = true
     }
@@ -96,6 +99,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun setConnecting(connecting: Boolean) {
         saveButton.isEnabled = !connecting
         progress.visibility = if (connecting) View.VISIBLE else View.GONE
+        status.visibility = View.VISIBLE
         status.setText(if (connecting) R.string.testing_connection else R.string.cloudflare_not_configured)
     }
 

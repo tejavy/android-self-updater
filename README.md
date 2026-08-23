@@ -30,6 +30,7 @@ only evaluates the installed app's entry.
 ```json
 {
   "com.example.app": {
+    "displayName": "Example App",
     "version": "1.2.0",
     "versionCode": 12,
     "apkUrl": "https://repo.example.com/releases/com.example.app-1.2.0.apk",
@@ -42,6 +43,9 @@ only evaluates the installed app's entry.
   }
 }
 ```
+
+`displayName` is optional. Catalog UIs can use it when an application is not installed and no
+on-device label is available.
 
 `versionCode` is authoritative. A version is available only when the remote value is greater than
 the installed app's version code. `version` is display text and is not semantically compared.
@@ -155,3 +159,8 @@ device. A higher catalog version gets a green update action; equal or older cata
 blue **Re-install app** action, and packages not present on the device get a blue install action.
 Because catalog application IDs are server-defined, the sample declares `QUERY_ALL_PACKAGES` to
 perform these checks reliably on Android 11 and newer. The version lookup stays entirely on-device.
+Authenticated users can pull down from the top of the catalog to force a fresh manifest request.
+The refresh triggers `POST /sync`, polls `GET /sync` at a rate-limit-safe interval until
+`syncRunning` becomes false, then bypasses HTTP caches while refetching the manifest. HTTP 429 is
+treated as an already-triggered or rate-limited sync. The visible list is preserved while this runs,
+and installed versions are recomputed before each action is updated.

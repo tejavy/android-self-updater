@@ -7,6 +7,19 @@
         <item quantity="one">%1$d app in catalog</item>
         <item quantity="other">%1$d apps in catalog</item>
     </plurals>
+    <plurals name="update_count">
+        <item quantity="zero">No updates</item>
+        <item quantity="one">%1$d update</item>
+        <item quantity="other">%1$d updates</item>
+    </plurals>
+    <plurals name="updates_found">
+        <item quantity="one">%1$d update is available</item>
+        <item quantity="other">%1$d updates are available</item>
+    </plurals>
+    <string name="catalog_summary">%1$s · %2$s</string>
+    <string name="never_checked">Not checked yet</string>
+    <string name="last_checked">Last checked %1$s</string>
+    <string name="last_checked_just_now">Last checked just now</string>
     <string name="settings">Settings</string>
     <string name="settings_title">Settings</string>
     <string name="back">Back</string>
@@ -16,15 +29,30 @@
     <string name="loading_catalog">Loading app catalog…</string>
     <string name="catalog_load_failed">Could not load the app catalog.</string>
     <string name="retry">Retry</string>
+    <string name="refresh_catalog">Refresh app catalog</string>
+    <string name="triggering_sync">Starting release sync…</string>
+    <string name="sync_in_progress">Syncing releases…</string>
+    <string name="refreshing_catalog">Sync complete · refreshing catalog…</string>
+    <string name="refresh_failed">Refresh failed</string>
+    <string name="refresh_failed_message">Couldn’t refresh the catalog</string>
+    <string name="catalog_unavailable">Catalog unavailable</string>
     <string name="available_version">Available: %1$s (code %2$d) · Not installed</string>
     <string name="available_and_installed_version">Available: %1$s (code %2$d)\nInstalled: %3$s (code %4$d)</string>
     <string name="unknown_version_name">Unknown</string>
     <string name="mandatory">Mandatory</string>
+    <string name="update_available">Update available</string>
+    <string name="up_to_date">Up to date</string>
+    <string name="not_installed">Not installed</string>
+    <string name="newer_version_installed">Newer version installed</string>
     <string name="no_release_notes">No release notes provided.</string>
+    <string name="whats_new">What’s new</string>
+    <string name="show_more">Show more</string>
+    <string name="show_less">Show less</string>
     <string name="release_note_bullet">• %1$s</string>
     <string name="install_app">Install app</string>
     <string name="reinstall_app">Re-install app</string>
     <string name="download_and_install_update">Download and install update</string>
+    <string name="installed_version_newer">Installed version is newer</string>
     <string name="retry_install">Try again</string>
     <string name="downloading">Downloading…</string>
     <string name="downloading_percent">Downloading… %1$d%%</string>
@@ -33,6 +61,8 @@
     <string name="waiting_for_permission">Allow installs from this app, then return.</string>
     <string name="install_failed">Download or installation failed.</string>
     <string name="cloudflare_settings_description">Configure the service token used to access the private update catalog. The token is tested before it is saved.</string>
+    <string name="cloudflare_access_title">Cloudflare Access</string>
+    <string name="update_server_address">Server: app-updates.tejaswi.space</string>
     <string name="cloudflare_client_id">CF-Access-Client-Id</string>
     <string name="cloudflare_client_secret">CF-Access-Client-Secret</string>
     <string name="save_and_connect">Save and connect</string>
@@ -44,6 +74,7 @@
     <string name="cloudflare_logged_out">Credentials removed</string>
     <string name="testing_connection">Testing connection…</string>
     <string name="connection_failed">Connection failed.</string>
+    <string name="no_updates_found">No new updates</string>
     <string name="logout">Log out</string>
     <string name="security_note">Credentials are encrypted with an Android Keystore key and excluded from device backup. Screenshots are disabled on this screen.</string>
 </resources>

@@ -117,6 +117,7 @@ public class Updater @JvmOverloads constructor(
             } else {
                 val update = UpdateAvailable(
                     applicationId = manifest.applicationId,
+                    displayName = manifest.displayName,
                     version = manifest.version,
                     versionCode = manifest.versionCode,
                     changelog = manifest.changelog.toList(),
@@ -289,6 +290,7 @@ public class Updater @JvmOverloads constructor(
     private fun io.github.selfupdater.internal.UpdateManifest.toUpdateAvailable(): UpdateAvailable =
         UpdateAvailable(
             applicationId = applicationId,
+            displayName = displayName,
             version = version,
             versionCode = versionCode,
             changelog = changelog.toList(),

@@ -12,6 +12,7 @@ import kotlinx.serialization.json.long
 
 internal data class UpdateManifest(
     val applicationId: String,
+    val displayName: String?,
     val version: String,
     val versionCode: Long,
     val apkUrl: String,
@@ -67,6 +68,7 @@ internal class ManifestParser(
     ): UpdateManifest {
         try {
             val version = root.requiredString("version").trim()
+            val displayName = root.optionalString("displayName")?.trim()?.takeIf(String::isNotEmpty)
             val versionCode = root.required("versionCode").jsonPrimitive.long
             val apkUrl = root.requiredString("apkUrl").trim()
             val sha256 = root.requiredString("sha256").trim().lowercase()
@@ -85,7 +87,16 @@ internal class ManifestParser(
                 throw InvalidManifestException("sha256 must contain exactly 64 hexadecimal characters")
             }
 
-            return UpdateManifest(applicationId, version, versionCode, apkUrl, sha256, changelog, mandatory)
+            return UpdateManifest(
+                applicationId,
+                displayName,
+                version,
+                versionCode,
+                apkUrl,
+                sha256,
+                changelog,
+                mandatory,
+            )
         } catch (error: InvalidManifestException) {
             throw error
         } catch (error: MissingApplicationManifestException) {
@@ -102,6 +113,14 @@ internal class ManifestParser(
 
     private fun kotlinx.serialization.json.JsonObject.requiredString(name: String): String =
         required(name).jsonPrimitive.let { primitive ->
+            if (!primitive.isString) {
+                throw InvalidManifestException("Manifest field '$name' must be a string")
+            }
+            primitive.content
+        }
+
+    private fun kotlinx.serialization.json.JsonObject.optionalString(name: String): String? =
+        this[name]?.jsonPrimitive?.let { primitive ->
             if (!primitive.isString) {
                 throw InvalidManifestException("Manifest field '$name' must be a string")
             }

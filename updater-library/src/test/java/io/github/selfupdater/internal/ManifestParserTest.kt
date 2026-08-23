@@ -23,6 +23,7 @@ class ManifestParserTest {
                 "mandatory": true
               },
               "com.example.app": {
+                "displayName": "Example App",
                 "version": "1.2.0",
                 "versionCode": 12,
                 "apkUrl": "https://repo.example.com/app-v1.2.0.apk",
@@ -38,6 +39,7 @@ class ManifestParserTest {
 
         assertEquals("1.2.0", result.version)
         assertEquals("com.example.app", result.applicationId)
+        assertEquals("Example App", result.displayName)
         assertEquals(12, result.versionCode)
         assertEquals(listOf("Added feature X", "Fixed crash Y"), result.changelog)
         assertFalse(result.mandatory)
