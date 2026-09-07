@@ -11,6 +11,8 @@ public class UpdateAvailable internal constructor(
     public val applicationId: String,
     /** Optional human-friendly application name supplied by the catalog. */
     public val displayName: String?,
+    /** Release track from which this update was selected. */
+    public val channel: UpdateChannel,
     /** Human-readable version name, for example `1.2.0`. */
     public val version: String,
     /** Monotonically increasing Android version code. */
@@ -27,6 +29,7 @@ public class UpdateAvailable internal constructor(
         other is UpdateAvailable &&
             applicationId == other.applicationId &&
             displayName == other.displayName &&
+            channel == other.channel &&
             version == other.version &&
             versionCode == other.versionCode &&
             changelog == other.changelog &&
@@ -37,6 +40,7 @@ public class UpdateAvailable internal constructor(
     override fun hashCode(): Int {
         var result = applicationId.hashCode()
         result = 31 * result + (displayName?.hashCode() ?: 0)
+        result = 31 * result + channel.hashCode()
         result = 31 * result + version.hashCode()
         result = 31 * result + versionCode.hashCode()
         result = 31 * result + changelog.hashCode()
@@ -47,7 +51,7 @@ public class UpdateAvailable internal constructor(
     }
 
     override fun toString(): String =
-        "UpdateAvailable(applicationId=$applicationId, displayName=$displayName, version=$version, " +
+        "UpdateAvailable(applicationId=$applicationId, displayName=$displayName, channel=$channel, version=$version, " +
             "versionCode=$versionCode, " +
             "mandatory=$mandatory, apkUrl=$apkUrl)"
 }

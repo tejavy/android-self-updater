@@ -40,6 +40,8 @@
     <string name="available_and_installed_version">Available: %1$s (code %2$d)\nInstalled: %3$s (code %4$d)</string>
     <string name="unknown_version_name">Unknown</string>
     <string name="mandatory">Mandatory</string>
+    <string name="stable_channel">Stable</string>
+    <string name="beta_channel">Beta</string>
     <string name="update_available">Update available</string>
     <string name="up_to_date">Up to date</string>
     <string name="not_installed">Not installed</string>

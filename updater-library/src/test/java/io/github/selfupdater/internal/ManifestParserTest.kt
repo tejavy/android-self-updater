@@ -2,6 +2,8 @@ package io.github.selfupdater.internal
 
 import io.github.selfupdater.InvalidManifestException
 import io.github.selfupdater.MissingApplicationManifestException
+import io.github.selfupdater.MissingUpdateChannelException
+import io.github.selfupdater.UpdateChannel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -40,10 +42,67 @@ class ManifestParserTest {
         assertEquals("1.2.0", result.version)
         assertEquals("com.example.app", result.applicationId)
         assertEquals("Example App", result.displayName)
+        assertEquals(UpdateChannel.STABLE, result.channel)
         assertEquals(12, result.versionCode)
         assertEquals(listOf("Added feature X", "Fixed crash Y"), result.changelog)
         assertFalse(result.mandatory)
         assertEquals(result.sha256.lowercase(), result.sha256)
+    }
+
+    @Test
+    fun `parses stable and beta channels without duplicating top-level stable fields`() {
+        val body =
+            """
+            {
+              "com.gidr.priority_game": {
+                "displayName": "Priority Game",
+                "version": "top-level-fallback",
+                "versionCode": 1,
+                "apkUrl": "https://repo.example.com/fallback.apk",
+                "sha256": "${"f".repeat(64)}",
+                "changelog": [],
+                "mandatory": false,
+                "channels": {
+                  "stable": {
+                    "version": "1.1", "versionCode": 210971727,
+                    "apkUrl": "https://repo.example.com/com.gidr.priority_game-1.1.apk",
+                    "sha256": "${"a".repeat(64)}", "changelog": ["Stable"], "mandatory": false
+                  },
+                  "beta": {
+                    "version": "1.1-dev.1", "versionCode": 210971051,
+                    "apkUrl": "https://repo.example.com/com.gidr.priority_game-1.1-dev.1.apk",
+                    "sha256": "${"b".repeat(64)}", "changelog": ["Beta"], "mandatory": false
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+
+        val catalog = parser.parseCatalog(body)
+        val beta = parser.parse(body, "com.gidr.priority_game", UpdateChannel.BETA)
+
+        assertEquals(listOf(UpdateChannel.STABLE, UpdateChannel.BETA), catalog.map { it.channel })
+        assertEquals(listOf("1.1", "1.1-dev.1"), catalog.map { it.version })
+        assertEquals("Priority Game", catalog.last().displayName)
+        assertEquals("1.1-dev.1", beta.version)
+        assertEquals(UpdateChannel.BETA, beta.channel)
+    }
+
+    @Test(expected = MissingUpdateChannelException::class)
+    fun `reports a missing requested beta channel`() {
+        parser.parse(
+            """
+            {
+              "com.example.app": {
+                "version":"1.0", "versionCode":1,
+                "apkUrl":"https://repo.example.com/app.apk",
+                "sha256":"${"a".repeat(64)}", "changelog":[], "mandatory":false
+              }
+            }
+            """.trimIndent(),
+            "com.example.app",
+            UpdateChannel.BETA,
+        )
     }
 
     @Test

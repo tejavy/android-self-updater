@@ -2,6 +2,7 @@ package io.github.selfupdater.internal
 
 import io.github.selfupdater.InvalidManifestException
 import io.github.selfupdater.UpdateHttpException
+import io.github.selfupdater.UpdateChannel
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import okhttp3.HttpUrl
@@ -11,8 +12,8 @@ internal class ManifestRepository(
     private val requests: RequestFactory,
     private val parser: ManifestParser,
 ) {
-    suspend fun fetch(url: HttpUrl, applicationId: String): UpdateManifest {
-        return parser.parse(fetchBody(url), applicationId)
+    suspend fun fetch(url: HttpUrl, applicationId: String, channel: UpdateChannel): UpdateManifest {
+        return parser.parse(fetchBody(url), applicationId, channel)
     }
 
     suspend fun fetchCatalog(url: HttpUrl): List<UpdateManifest> {

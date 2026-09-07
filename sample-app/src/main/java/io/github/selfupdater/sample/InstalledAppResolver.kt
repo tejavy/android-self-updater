@@ -7,6 +7,9 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import io.github.selfupdater.UpdateAvailable
 
+internal val UpdateAvailable.catalogEntryId: String
+    get() = "$applicationId:${channel.name}"
+
 internal data class InstalledAppVersion(
     val displayName: String,
     val icon: Drawable,
@@ -18,6 +21,8 @@ internal data class CatalogApp(
     val release: UpdateAvailable,
     val installedVersion: InstalledAppVersion?,
 ) {
+    val id: String = release.catalogEntryId
+
     val displayName: String = installedVersion?.displayName
         ?: release.displayName
         ?: release.applicationId
@@ -76,7 +81,8 @@ internal class InstalledAppResolver(context: Context) {
                     CatalogAction.Reinstall, CatalogAction.NewerInstalled -> 1
                     CatalogAction.Install -> 2
                 }
-            }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName },
+            }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName }
+                .thenBy { it.release.channel.ordinal },
         )
 
     private fun packageInfo(applicationId: String): PackageInfo? = try {

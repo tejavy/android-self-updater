@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import io.github.selfupdater.UpdateAvailable
+import io.github.selfupdater.UpdateChannel
 
 internal class CatalogAdapter(
     private val onInstall: (UpdateAvailable) -> Unit,
@@ -31,31 +32,34 @@ internal class CatalogAdapter(
     val updateCount: Int
         get() = entries.count { it.action == CatalogAction.Update }
 
+    val applicationCount: Int
+        get() = entries.asSequence().map { it.release.applicationId }.distinct().count()
+
     fun submitList(newEntries: List<CatalogApp>) {
         val previousSize = entries.size
         entries.clear()
         if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
         entries.addAll(newEntries)
-        val applicationIds = newEntries.mapTo(mutableSetOf()) { it.release.applicationId }
-        states.keys.retainAll(applicationIds)
-        expandedNotes.retainAll(applicationIds)
+        val entryIds = newEntries.mapTo(mutableSetOf()) { it.id }
+        states.keys.retainAll(entryIds)
+        expandedNotes.retainAll(entryIds)
         if (newEntries.isNotEmpty()) notifyItemRangeInserted(0, newEntries.size)
     }
 
-    fun markDownloading(applicationId: String, percent: Int) = updateState(
-        applicationId,
+    fun markDownloading(update: UpdateAvailable, percent: Int) = updateState(
+        update.catalogEntryId,
         RowState.Downloading(percent),
     )
 
-    fun markInstalling(applicationId: String) = updateState(applicationId, RowState.Installing)
+    fun markInstalling(update: UpdateAvailable) = updateState(update.catalogEntryId, RowState.Installing)
 
-    fun markWaitingForPermission(applicationId: String) = updateState(
-        applicationId,
+    fun markWaitingForPermission(update: UpdateAvailable) = updateState(
+        update.catalogEntryId,
         RowState.WaitingForPermission,
     )
 
-    fun markFailed(applicationId: String, message: String) = updateState(
-        applicationId,
+    fun markFailed(update: UpdateAvailable, message: String) = updateState(
+        update.catalogEntryId,
         RowState.Failed(message),
     )
 
@@ -64,9 +68,9 @@ internal class CatalogAdapter(
         if (entries.isNotEmpty()) notifyItemRangeChanged(0, entries.size)
     }
 
-    private fun updateState(applicationId: String, state: RowState) {
-        states[applicationId] = state
-        val index = entries.indexOfFirst { it.release.applicationId == applicationId }
+    private fun updateState(entryId: String, state: RowState) {
+        states[entryId] = state
+        val index = entries.indexOfFirst { it.id == entryId }
         if (index >= 0) notifyItemChanged(index)
     }
 
@@ -76,12 +80,12 @@ internal class CatalogAdapter(
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val entry = entries[position]
-        holder.bind(entry, states[entry.release.applicationId] ?: RowState.Idle)
+        holder.bind(entry, states[entry.id] ?: RowState.Idle)
     }
 
     override fun getItemCount(): Int = entries.size
 
-    override fun getItemId(position: Int): Long = entries[position].release.applicationId.hashCode().toLong()
+    override fun getItemId(position: Int): Long = entries[position].id.hashCode().toLong()
 
     inner class AppViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val appIcon: ImageView = view.findViewById(R.id.appIcon)
@@ -89,6 +93,7 @@ internal class CatalogAdapter(
         private val appId: TextView = view.findViewById(R.id.applicationId)
         private val version: TextView = view.findViewById(R.id.version)
         private val statusBadge: TextView = view.findViewById(R.id.statusBadge)
+        private val channelBadge: TextView = view.findViewById(R.id.channelBadge)
         private val mandatory: TextView = view.findViewById(R.id.mandatoryBadge)
         private val notes: TextView = view.findViewById(R.id.releaseNotes)
         private val notesToggle: Button = view.findViewById(R.id.notesToggle)
@@ -117,6 +122,7 @@ internal class CatalogAdapter(
                 )
             } ?: context.getString(R.string.available_version, release.version, release.versionCode)
             mandatory.visibility = if (release.mandatory) View.VISIBLE else View.GONE
+            bindChannelBadge(release.channel)
             bindStatusBadge(entry.action)
             val releaseNotes = if (release.changelog.isEmpty()) {
                 context.getString(R.string.no_release_notes)
@@ -125,12 +131,12 @@ internal class CatalogAdapter(
             }
             notes.text = releaseNotes
             val canExpand = release.changelog.size > COLLAPSED_NOTE_COUNT || releaseNotes.length > LONG_NOTES_LENGTH
-            val isExpanded = release.applicationId in expandedNotes
+            val isExpanded = entry.id in expandedNotes
             notes.maxLines = if (isExpanded) Integer.MAX_VALUE else COLLAPSED_NOTE_LINES
             notes.ellipsize = if (isExpanded) null else TextUtils.TruncateAt.END
             notesToggle.visibility = if (canExpand) View.VISIBLE else View.GONE
             notesToggle.setText(if (isExpanded) R.string.show_less else R.string.show_more)
-            notesToggle.setOnClickListener { toggleNotes(release.applicationId) }
+            notesToggle.setOnClickListener { toggleNotes(entry.id) }
 
             action.backgroundTintList = if (entry.action == CatalogAction.Update) {
                 updateButtonTint
@@ -218,11 +224,27 @@ internal class CatalogAdapter(
             statusBadge.setBackgroundResource(background)
             statusBadge.setTextColor(ContextCompat.getColor(context, color))
         }
+
+        private fun bindChannelBadge(channel: UpdateChannel) {
+            val context = itemView.context
+            when (channel) {
+                UpdateChannel.STABLE -> {
+                    channelBadge.setText(R.string.stable_channel)
+                    channelBadge.setBackgroundResource(R.drawable.badge_current)
+                    channelBadge.setTextColor(ContextCompat.getColor(context, R.color.current_badge_text))
+                }
+                UpdateChannel.BETA -> {
+                    channelBadge.setText(R.string.beta_channel)
+                    channelBadge.setBackgroundResource(R.drawable.badge_beta)
+                    channelBadge.setTextColor(ContextCompat.getColor(context, R.color.beta_badge_text))
+                }
+            }
+        }
     }
 
-    private fun toggleNotes(applicationId: String) {
-        if (!expandedNotes.add(applicationId)) expandedNotes.remove(applicationId)
-        val index = entries.indexOfFirst { it.release.applicationId == applicationId }
+    private fun toggleNotes(entryId: String) {
+        if (!expandedNotes.add(entryId)) expandedNotes.remove(entryId)
+        val index = entries.indexOfFirst { it.id == entryId }
         if (index >= 0) notifyItemChanged(index)
     }
 

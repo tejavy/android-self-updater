@@ -244,7 +244,7 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
         adapter.setOperationsEnabled(false)
         swipeRefresh.isEnabled = false
         toolbar.menu.findItem(R.id.action_refresh).isEnabled = false
-        adapter.markDownloading(update.applicationId, -1)
+        adapter.markDownloading(update, -1)
         updater?.download(update)
     }
 
@@ -253,28 +253,28 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
     override fun onUpdateAvailable(update: UpdateAvailable) = Unit
 
     override fun onDownloadProgress(percent: Int) {
-        activeUpdate?.let { adapter.markDownloading(it.applicationId, percent) }
+        activeUpdate?.let { adapter.markDownloading(it, percent) }
     }
 
     override fun onDownloadComplete(apkFile: File) {
         val update = activeUpdate ?: return
         downloadedApk = apkFile
-        adapter.markInstalling(update.applicationId)
+        adapter.markInstalling(update)
         updater?.installAsync(update, apkFile)
     }
 
     override fun onInstalling() {
         installerLaunched = true
-        activeUpdate?.let { adapter.markInstalling(it.applicationId) }
+        activeUpdate?.let { adapter.markInstalling(it) }
     }
 
     override fun onFailure(error: UpdaterException) {
         val update = activeUpdate ?: return
         if (error is InstallPermissionRequiredException) {
-            adapter.markWaitingForPermission(update.applicationId)
+            adapter.markWaitingForPermission(update)
             installPermission.launch(error.settingsIntent)
         } else {
-            adapter.markFailed(update.applicationId, error.message ?: getString(R.string.install_failed))
+            adapter.markFailed(update, error.message ?: getString(R.string.install_failed))
             activeUpdate = null
             downloadedApk = null
             adapter.setOperationsEnabled(true)
@@ -306,13 +306,18 @@ class MainActivity : AppCompatActivity(), UpdaterListener {
     private fun renderCatalogSummary(catalogApps: List<CatalogApp>) {
         val updates = catalogApps.count { it.action == CatalogAction.Update }
         val updateText = resources.getQuantityString(R.plurals.update_count, updates, updates)
-        val appText = resources.getQuantityString(R.plurals.app_count, catalogApps.size, catalogApps.size)
+        val applicationCount = catalogApps.asSequence().map { it.release.applicationId }.distinct().count()
+        val appText = resources.getQuantityString(R.plurals.app_count, applicationCount, applicationCount)
         findViewById<TextView>(R.id.appCount).text = getString(R.string.catalog_summary, updateText, appText)
     }
 
     private fun renderCatalogSummaryFromAdapter() {
         val updateText = resources.getQuantityString(R.plurals.update_count, adapter.updateCount, adapter.updateCount)
-        val appText = resources.getQuantityString(R.plurals.app_count, adapter.itemCount, adapter.itemCount)
+        val appText = resources.getQuantityString(
+            R.plurals.app_count,
+            adapter.applicationCount,
+            adapter.applicationCount,
+        )
         findViewById<TextView>(R.id.appCount).text = getString(R.string.catalog_summary, updateText, appText)
     }
 

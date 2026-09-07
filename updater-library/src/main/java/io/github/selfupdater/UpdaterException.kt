@@ -40,6 +40,16 @@ public class MissingApplicationManifestException(
     public val applicationId: String,
 ) : UpdaterException("Update catalog has no entry for application ID '$applicationId'")
 
+/** The selected application entry does not publish the requested release channel. */
+public class MissingUpdateChannelException(
+    /** Package/application ID whose channel was requested. */
+    public val applicationId: String,
+    /** Requested release channel. */
+    public val channel: UpdateChannel,
+) : UpdaterException(
+    "Update catalog entry '$applicationId' has no ${channel.manifestKey} channel",
+)
+
 /** The APK could not be read from or written to app cache. */
 public class UpdateStorageException(
     message: String,

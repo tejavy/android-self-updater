@@ -11,4 +11,6 @@
     <color name="newer_badge_background">#FFF0CF</color>
     <color name="newer_badge_text">#725500</color>
     <color name="mandatory_text">#8A1C1C</color>
+    <color name="beta_badge_background">#EEE3FF</color>
+    <color name="beta_badge_text">#5B2B88</color>
 </resources>

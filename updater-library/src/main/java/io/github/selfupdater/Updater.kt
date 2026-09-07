@@ -46,6 +46,7 @@ import io.github.selfupdater.internal.VersionComparator
  * @param requestTimeoutSeconds connect, read, and write timeout applied to HTTP requests.
  * @param okHttpClient optional client whose interceptors, authenticator, TLS, and cache are reused.
  * @param retryPolicy exponential-backoff policy for retryable network failures.
+ * @param channel release track used by [checkForUpdate]. Catalog loading returns every supported track.
  */
 public class Updater @JvmOverloads constructor(
     context: Context,
@@ -55,6 +56,7 @@ public class Updater @JvmOverloads constructor(
     requestTimeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS,
     okHttpClient: OkHttpClient? = null,
     retryPolicy: RetryPolicy = RetryPolicy(),
+    private val channel: UpdateChannel = UpdateChannel.STABLE,
 ) : Closeable {
     private val applicationContext = context.applicationContext
     private val manifestHttpUrl = UrlValidator.requireHttps(manifestUrl)
@@ -95,7 +97,7 @@ public class Updater @JvmOverloads constructor(
     public fun check(): Job = launchReporting { checkForUpdate() }
 
     /**
-     * Checks the manifest and compares its version code with the installed app.
+     * Checks the configured manifest channel and compares its version code with the installed app.
      *
      * @return [UpdateCheckResult.Available] only when the manifest version code is higher.
      * @throws UpdaterException when validation, parsing, or networking fails.
@@ -105,7 +107,7 @@ public class Updater @JvmOverloads constructor(
         try {
             publish(UpdateState.Checking) { it.onChecking() }
             val manifest = withContext(ioDispatcher) {
-                manifestRepository.fetch(manifestHttpUrl, applicationContext.packageName)
+                manifestRepository.fetch(manifestHttpUrl, applicationContext.packageName, channel)
             }
             UrlValidator.requireHttps(manifest.apkUrl)
             val currentVersionCode = withContext(ioDispatcher) {
@@ -118,6 +120,7 @@ public class Updater @JvmOverloads constructor(
                 val update = UpdateAvailable(
                     applicationId = manifest.applicationId,
                     displayName = manifest.displayName,
+                    channel = manifest.channel,
                     version = manifest.version,
                     versionCode = manifest.versionCode,
                     changelog = manifest.changelog.toList(),
@@ -138,7 +141,8 @@ public class Updater @JvmOverloads constructor(
     /**
      * Downloads and validates the complete manifest catalog without comparing entries to the
      * host app. This is intended for update dashboards that manage multiple application IDs.
-     * Entries retain the manifest order and may be passed directly to [downloadApk] and [install].
+     * Applications retain manifest order; each application's stable entry precedes its beta entry.
+     * Returned entries may be passed directly to [downloadApk] and [install].
      *
      * Unlike [checkForUpdate], this method does not publish listener callbacks or update [state].
      *
@@ -291,6 +295,7 @@ public class Updater @JvmOverloads constructor(
         UpdateAvailable(
             applicationId = applicationId,
             displayName = displayName,
+            channel = channel,
             version = version,
             versionCode = versionCode,
             changelog = changelog.toList(),
@@ -308,12 +313,16 @@ public class Updater @JvmOverloads constructor(
         private var requestTimeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS
         private var client: OkHttpClient? = null
         private var retryPolicy: RetryPolicy = RetryPolicy()
+        private var channel: UpdateChannel = UpdateChannel.STABLE
 
         /** Sets the required HTTPS manifest URL. */
         public fun manifestUrl(url: String): Builder = apply { manifestUrl = url }
 
         /** Sets the optional callback receiver. */
         public fun listener(listener: UpdaterListener?): Builder = apply { this.listener = listener }
+
+        /** Selects the release track used by [Updater.checkForUpdate]. */
+        public fun channel(channel: UpdateChannel): Builder = apply { this.channel = channel }
 
         /** Adds or replaces one header for both manifest and APK requests. */
         public fun header(name: String, value: String): Builder = apply { headers[name] = value }
@@ -345,6 +354,7 @@ public class Updater @JvmOverloads constructor(
             requestTimeoutSeconds = requestTimeoutSeconds,
             okHttpClient = client,
             retryPolicy = retryPolicy,
+            channel = channel,
         )
     }
 

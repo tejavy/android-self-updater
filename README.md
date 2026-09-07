@@ -23,9 +23,10 @@ Catalog/dashboard apps can load every entry without applying the host-app versio
 val releases: List<UpdateAvailable> = updater.fetchCatalog()
 ```
 
-Each result exposes its `applicationId` and can be passed directly to `downloadApk()` and
-`install()`. Normal app integrations should continue to use `check()` or `checkForUpdate()`, which
-only evaluates the installed app's entry.
+Each result exposes its `applicationId` and `channel` and can be passed directly to `downloadApk()`
+and `install()`. Channel-aware entries produce one catalog result per published stable/beta track.
+Normal app integrations should continue to use `check()` or `checkForUpdate()`, which evaluates the
+installed app's stable track unless configured otherwise.
 
 ```json
 {
@@ -39,13 +40,35 @@ only evaluates the installed app's entry.
       "Added feature X",
       "Fixed crash Y"
     ],
-    "mandatory": false
+    "mandatory": false,
+    "channels": {
+      "stable": {
+        "version": "1.2.0",
+        "versionCode": 12,
+        "apkUrl": "https://repo.example.com/releases/com.example.app-1.2.0.apk",
+        "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "changelog": ["Stable release"],
+        "mandatory": false
+      },
+      "beta": {
+        "version": "1.3.0-beta.1",
+        "versionCode": 13,
+        "apkUrl": "https://repo.example.com/releases/com.example.app-1.3.0-beta.1.apk",
+        "sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        "changelog": ["Beta preview"],
+        "mandatory": false
+      }
+    }
   }
 }
 ```
 
 `displayName` is optional. Catalog UIs can use it when an application is not installed and no
 on-device label is available.
+
+`channels` is optional. Without it, the top-level release is treated as stable. When it is present,
+the channel-specific stable entry takes precedence over duplicate top-level fields, and catalog
+loading also returns the beta entry. Unknown future channel names are ignored.
 
 `versionCode` is authoritative. A version is available only when the remote value is greater than
 the installed app's version code. `version` is display text and is not semantically compared.
@@ -99,6 +122,7 @@ on the Android main thread. Suspending functions throw typed `UpdaterException` 
 ```kotlin
 val updater = Updater.Builder(applicationContext)
     .manifestUrl("https://repo.example.com/latest.json")
+    .channel(UpdateChannel.BETA) // Omit for stable.
     .header("Authorization", "Bearer $token")
     .requestTimeoutSeconds(45)
     .retryPolicy(RetryPolicy(maxAttempts = 4))
@@ -137,7 +161,7 @@ Install Android SDK Platform 37, use JDK 17, then run:
 ./gradlew :updater-library:publishToMavenLocal
 ```
 
-The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.3.0`. Adjust the
+The default Maven coordinates are `io.github.selfupdater:android-self-updater:1.5.0`. Adjust the
 root `group` and `version` before publishing to your own Maven repository.
 
 ### Release signing
